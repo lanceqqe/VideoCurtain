@@ -33,6 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Asks for the Accessibility permission on first launch.
         let prompt = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(prompt)
+
+        curtain.restoreToolbarAfterRestart()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -63,7 +65,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class Curtain {
     private var safariWindow: AXUIElement?
     private var safariApp: AXUIElement?
-    private var toolbarWasAlwaysShown = false
+
+    // Saved to disk: if this app is killed mid-video, the next launch can still
+    // put back the Safari setting it changed.
+    private var weHidToolbar: Bool {
+        get { UserDefaults.standard.bool(forKey: "weHidToolbar") }
+        set { UserDefaults.standard.set(newValue, forKey: "weHidToolbar") }
+    }
     private var strips: [NSPanel] = []
     private var timer: Timer?
     private var escapeMonitor: Any?
@@ -83,9 +91,9 @@ final class Curtain {
         safariApp = app
 
         // Lets the page reach the top of the screen, so the video needs no black bar.
-        if let item = AX.alwaysShowToolbarItem(in: app), AX.isChecked(item) {
-            AXUIElementPerformAction(item, kAXPressAction as CFString)
-            toolbarWasAlwaysShown = true
+        if !weHidToolbar, let item = AX.alwaysShowToolbarItem(in: app), AX.isChecked(item),
+           AXUIElementPerformAction(item, kAXPressAction as CFString) == .success {
+            weHidToolbar = true
         }
 
         timer = Timer.scheduledTimer(timeInterval: 0.25, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
@@ -112,12 +120,34 @@ final class Curtain {
         terminationObserver = nil
         strips.forEach { $0.orderOut(nil) }
         strips = []
-        if toolbarWasAlwaysShown, let safariApp, let item = AX.alwaysShowToolbarItem(in: safariApp), !AX.isChecked(item) {
-            AXUIElementPerformAction(item, kAXPressAction as CFString)
-        }
-        toolbarWasAlwaysShown = false
-        safariApp = nil
         safariWindow = nil
+        if let safariApp { restoreToolbar(in: safariApp) }
+        safariApp = nil
+    }
+
+    // One press, no re-check: the menu item's check mark lags by over half a second,
+    // and pressing again on a stale reading would hide the toolbar again.
+    // The flag stays set if Safari can't be reached, e.g. it has quit.
+    private func restoreToolbar(in app: AXUIElement) {
+        guard weHidToolbar, let item = AX.alwaysShowToolbarItem(in: app),
+              AXUIElementPerformAction(item, kAXPressAction as CFString) == .success else { return }
+        weHidToolbar = false
+    }
+
+    func restoreToolbarAfterRestart() {
+        guard weHidToolbar else { return }
+        // Waits so that a launch caused by a new video keeps the toolbar hidden instead.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in
+            guard safariWindow == nil,
+                  let safari = NSRunningApplication.runningApplications(withBundleIdentifier: safariBundleID).first else { return }
+            let app = AXUIElementCreateApplication(safari.processIdentifier)
+            // Nothing has pressed it recently, so the check mark can be trusted here.
+            if let item = AX.alwaysShowToolbarItem(in: app), AX.isChecked(item) {
+                weHidToolbar = false
+            } else {
+                restoreToolbar(in: app)
+            }
+        }
     }
 
     private func lowerIfSafariIsFrontmost() {

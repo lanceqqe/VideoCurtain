@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Video Curtain",
   "description": "Fullscreen video without a new desktop: the video fills the Safari window and a black curtain covers everything else.",
-  "version": "1.2",
+  "version": "1.3",
   "icons": { "128": "icon-128.png" },
   "permissions": ["nativeMessaging", "scripting", "storage", "tabs"],
   "host_permissions": ["<all_urls>"],
