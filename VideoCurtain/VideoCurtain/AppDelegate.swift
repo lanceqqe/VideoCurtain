@@ -192,9 +192,11 @@ final class Curtain {
 
     private func makeStrip() -> NSPanel {
         // Non-activating, so a click on the black never takes focus from Safari.
-        let strip = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let strip = StripPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         strip.backgroundColor = .black
-        strip.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        // Above Safari's windows but under the menu bar, so the clock, battery and
+        // the rest still appear when the cursor reaches the top of the screen.
+        strip.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue - 1)
         strip.collectionBehavior = [.managed, .fullScreenAuxiliary]
         strip.hidesOnDeactivate = false
         strip.isReleasedWhenClosed = false
@@ -209,6 +211,14 @@ final class Curtain {
             let right = rhs.frame.intersection(frame)
             return left.width * left.height < right.width * right.height
         }
+    }
+}
+
+/// AppKit would otherwise push a window at this level down out of the menu bar's
+/// area, onto the video.
+final class StripPanel: NSPanel {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
     }
 }
 
