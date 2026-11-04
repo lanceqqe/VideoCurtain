@@ -1,0 +1,23 @@
+[data-video-curtain] {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  transform: none !important;
+  background: #000 !important;
+  z-index: 2147483647 !important;
+}
+
+[data-video-curtain]::backdrop {
+  background: #000;
+}
+
+html[data-video-curtain-page],
+html[data-video-curtain-page] body {
+  overflow: hidden !important;
+}
