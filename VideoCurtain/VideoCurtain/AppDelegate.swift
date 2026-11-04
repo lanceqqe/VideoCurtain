@@ -161,14 +161,17 @@ final class Curtain {
             lower()
             return
         }
-        guard let webArea = AX.largestWebArea(in: safariWindow),
-              let screen = screen(containing: windowFrame) else { return }
-        layOut(around: AX.nsRect(from: webArea), on: screen)
+        guard let webArea = AX.largestWebArea(in: safariWindow) else { return }
+        layOut(around: AX.nsRect(from: webArea), within: AX.nsRect(from: windowFrame))
     }
 
-    private func layOut(around page: CGRect, on screen: NSScreen) {
-        let full = screen.frame
-        let hole = page.intersection(full).integral
+    // Covers only Safari's own window. The rest of the screen, such as the band beside
+    // the camera, is already black in fullscreen, and a strip there leaves a visible seam.
+    private func layOut(around page: CGRect, within full: CGRect) {
+        // Safari leaves a one-pixel gray line along the top of the page while its toolbar
+        // is hidden, so the top strip always reaches a little way over it.
+        var hole = page.intersection(full).integral
+        hole.size.height = max(hole.height - 4, 0)
         let frames = [
             CGRect(x: full.minX, y: hole.maxY, width: full.width, height: full.maxY - hole.maxY),
             CGRect(x: full.minX, y: full.minY, width: full.width, height: hole.minY - full.minY),
@@ -202,15 +205,6 @@ final class Curtain {
         strip.isReleasedWhenClosed = false
         strip.hasShadow = false
         return strip
-    }
-
-    private func screen(containing axFrame: CGRect) -> NSScreen? {
-        let frame = AX.nsRect(from: axFrame)
-        return NSScreen.screens.max { lhs, rhs in
-            let left = lhs.frame.intersection(frame)
-            let right = rhs.frame.intersection(frame)
-            return left.width * left.height < right.width * right.height
-        }
     }
 }
 
